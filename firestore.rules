@@ -12,6 +12,8 @@ service cloud.firestore {
       match /reviews/{reviewId} {
         allow read: if resource.data.status == "published" || admin();
         allow create: if signedIn()
+          && exists(/databases/$(database)/documents/places/$(placeId))
+          && get(/databases/$(database)/documents/places/$(placeId)).data.status == "published"
           && reviewId == request.auth.uid
           && request.resource.data.keys().hasOnly(["uid", "rating", "comment", "status", "createdAt"])
           && request.resource.data.uid == request.auth.uid
