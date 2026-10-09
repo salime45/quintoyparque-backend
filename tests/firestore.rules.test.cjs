@@ -98,9 +98,9 @@ test("only valid pending reviews on published places are accepted", async () => 
   await assertFails(setDoc(doc(anonymous(), "places", "approved", "reviews", "guest"), review("guest")));
   await assertSucceeds(setDoc(doc(user(), "places", "approved", "reviews", "person-1"), review("person-1")));
   await assertFails(setDoc(doc(user(), "places", "approved", "reviews", "person-2"), review("someone-else")));
-  await assertFails(setDoc(doc(user(), "places", "approved", "reviews", "invalid"), review("person-1", { rating: 9 })));
-  await assertFails(setDoc(doc(user(), "places", "draft", "reviews", "person-1"), review("person-1")));
-  await assertFails(setDoc(doc(user(), "places", "missing", "reviews", "person-1"), review("person-1")));
+  await assertFails(setDoc(doc(user("person-3"), "places", "approved", "reviews", "person-3"), review("person-3", { rating: 9 })));
+  await assertFails(setDoc(doc(user("person-4"), "places", "draft", "reviews", "person-4"), review("person-4")));
+  await assertFails(setDoc(doc(user("person-5"), "places", "missing", "reviews", "person-5"), review("person-5")));
 });
 
 test("reviews must be moderated before they become public", async () => {
