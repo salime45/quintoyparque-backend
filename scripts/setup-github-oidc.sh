@@ -57,11 +57,17 @@ if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository_id=assertion.repository_id" \
     --attribute-condition="assertion.repository_id=='${GITHUB_REPO_ID}' && assertion.repository_owner_id=='${GITHUB_OWNER_ID}' && assertion.repository=='${GITHUB_REPO}' && assertion.ref=='refs/heads/main'"
 else
-  echo "AVISO: el proveedor ya existe. Comprueba su condicion antes de continuar."
-  gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
+  # No conceder acceso si un proveedor preexistente esta configurado con
+  # restricciones distintas (podria confiar en otro repositorio o rama).
+  EXPECTED_CONDITION="assertion.repository_id=='${GITHUB_REPO_ID}' && assertion.repository_owner_id=='${GITHUB_OWNER_ID}' && assertion.repository=='${GITHUB_REPO}' && assertion.ref=='refs/heads/main'"
+  CURRENT_CONDITION="$(gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
     --project="$PROJECT_ID" --location=global \
     --workload-identity-pool="$POOL_ID" \
-    --format="yaml(attributeCondition,attributeMapping)"
+    --format="value(attributeCondition)")"
+  if [[ "$CURRENT_CONDITION" != "$EXPECTED_CONDITION" ]]; then
+    echo "ERROR: proveedor existente con una condicion distinta. No se concedera acceso." >&2
+    exit 1
+  fi
 fi
 
 gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT" \
