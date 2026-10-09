@@ -1,0 +1,77 @@
+name: Firestore - tests and deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/firestore.yml"
+      - "firestore.rules"
+      - "firebase.json"
+      - "package.json"
+      - "tests/**"
+  pull_request:
+    paths:
+      - ".github/workflows/firestore.yml"
+      - "firestore.rules"
+      - "firebase.json"
+      - "package.json"
+      - "tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test-rules:
+    name: Test Firestore security rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install test tools
+        run: npm install --no-audit --no-fund
+      - name: Firestore emulator rules tests
+        run: npm test
+
+  deploy-rules:
+    name: Publish Firestore security rules
+    needs: test-rules
+    # Manual deployment is possible after configuring OIDC.
+    # Enable automatic deployments with the repo variable FIREBASE_BACKEND_DEPLOY_ENABLED=true.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'workflow_dispatch' || vars.FIREBASE_BACKEND_DEPLOY_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Authenticate to Google Cloud (no long-lived keys)
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: quintoyparque
+          workload_identity_provider: projects/277470161375/locations/global/workloadIdentityPools/github-qyp-backend/providers/main
+          service_account: qyp-firestore-ci@quintoyparque.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Firebase CLI
+        run: npm install --no-audit --no-fund
+      - name: Deploy only Firestore rules (no indexes or frontend)
+        run: npx firebase deploy --project quintoyparque --only firestore:rules --non-interactive
